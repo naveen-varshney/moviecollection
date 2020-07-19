@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from django.db.models import Count
 from django.contrib.auth.models import User
 
 
@@ -38,6 +39,16 @@ class MovieCollection(BaseModel):
 
     def __str__(self):
         return f"Name : {self.title}"
+
+    @staticmethod
+    def fav_genres(user):
+        fav_genres = (
+            MovieGenre.objects.filter(movies__collections__user=user)
+            .values_list("name", flat=True)
+            .annotate(movie_count=Count("movies"))
+            .order_by("-movie_count")[:3]
+        )
+        return list(fav_genres)
 
 
 class Movie(BaseModel):

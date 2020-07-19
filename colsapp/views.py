@@ -51,10 +51,16 @@ def reset_request_count(request):
 @permission_classes([permissions.IsAuthenticated])
 def home_page(request):
     page = request.GET.get("page")
+    full_path = f"movies_{request.get_full_path()}"
+
+    if full_path in cache:
+        # getting from cache
+        return Response(cache.get(full_path), status=status.HTTP_200_OK)
 
     try:
         client = MayaApiClient()
         data = client.get_movie_list(page=page)
+
     except ApiConnectionErrorException as e:
         pass
 
@@ -63,6 +69,7 @@ def home_page(request):
 
     except Exception as e:
         pass
+
     else:
         # API seems to be return is_success flag in case of failure
         if "is_success" not in data:
@@ -77,6 +84,9 @@ def home_page(request):
                 previous_page = previous_page.replace(api_movie_url, request.path)
                 data["previous"] = previous_page
             return Response(data, status=status.HTTP_200_OK)
+
+    # setting the cache
+    cache.set(full_path, data)
 
     return Response(data, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
@@ -106,3 +116,28 @@ class CollectionViewset(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    def list(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            response = self.get_paginated_response(serializer.data)
+            # formating data as expected
+            response.data["is_success"] = True
+            response.data["data"] = {
+                "collections": response.data.pop("results"),
+                "fav_genres": MovieCollection.fav_genres(request.user),
+            }
+        else:
+            serializer = self.get_serializer(queryset, many=True)
+            data = {
+                "is_success": True,
+                data: {
+                    "collections": response.data.pop("results"),
+                    "fav_genres": MovieCollection.fav_genres(request.user),
+                },
+            }
+            response = Response(data, status=status.HTTP_200_OK)
+        return response

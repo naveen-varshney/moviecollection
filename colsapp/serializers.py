@@ -17,14 +17,10 @@ class UserSerializer(serializers.ModelSerializer):
 
 class CollectionSerializer(serializers.HyperlinkedModelSerializer):
     user = serializers.ReadOnlyField(source="user.username")
-    favourite_genres = serializers.SerializerMethodField()
 
     class Meta:
         model = MovieCollection
-        fields = ("id", "title", "description", "movies", "user", "favourite_genres")
-
-    def get_favourite_genres(self, obj):
-        return []
+        fields = ("id", "title", "description", "movies", "user")
 
     def create(self, validated_data):
         movies = validated_data.pop("movies")
